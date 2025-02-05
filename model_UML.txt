@@ -1,0 +1,48 @@
+@startuml
+class Actor {
+    reset_parameters()
+    forward()
+        seed
+    fc1
+    fc2
+    fc3
+    bn1
+    __init__()
+}
+class Critic {
+    reset_parameters()
+    forward()
+        seed
+    fcs1
+    fc2
+    fc3
+    bn1
+    __init__()
+}
+class Actor_SELU {
+    reset_parameters()
+    forward()
+        seed
+    fc1
+    fc2
+    fc3
+    fc4
+    selu1
+    selu2
+    selu3
+    __init__()
+}
+class Critic_SELU {
+    reset_parameters()
+    forward()
+        seed
+    fcs1
+    fc2
+    fc3
+    fc4
+    selu1
+    selu2
+    selu3
+    __init__()
+}
+@enduml

@@ -1,0 +1,24 @@
+Metadata-Version: 2.1
+Name: unityagents
+Version: 0.4.0
+Summary: Unity Machine Learning Agents
+Home-page: https://github.com/Unity-Technologies/ml-agents
+Author: Unity Technologies
+Author-email: ML-Agents@unity3d.com
+License: Apache License 2.0
+Requires-Dist: tensorflow==2.18.0
+Requires-Dist: Pillow>=4.2.1
+Requires-Dist: matplotlib
+Requires-Dist: numpy>=1.11.0
+Requires-Dist: jupyter
+Requires-Dist: pytest>=3.2.2
+Requires-Dist: docopt
+Requires-Dist: pyyaml
+Requires-Dist: protobuf
+Requires-Dist: grpcio
+Requires-Dist: torch==2.5.1
+Requires-Dist: pandas
+Requires-Dist: scipy
+Requires-Dist: ipykernel
+
+Unity Machine Learning Agents allows researchers and developers to transform games and simulations created using the Unity Editor into environments where intelligent agents can be trained using reinforcement learning, evolutionary strategies, or other machine learning methods through a simple to use Python API.

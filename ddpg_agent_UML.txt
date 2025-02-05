@@ -1,0 +1,57 @@
+@startuml
+class Agent {
+    step()
+    act()
+    reset()
+    learn()
+    soft_update()
+        state_size
+    action_size
+    num_agents
+    seed
+    batch_size
+    update_every
+    num_updates
+    buffer_learn_size
+    actor_local
+    actor_target
+    actor_optimizer
+    critic_local
+    critic_target
+    critic_optimizer
+    actor_local
+    actor_target
+    actor_optimizer
+    critic_local
+    critic_target
+    critic_optimizer
+    noise
+    memory
+    t_step
+    __init__()
+}
+class OUNoise {
+    reset()
+    sample()
+        mu
+    theta
+    sigma
+    size
+    seed
+    state
+    state
+    __init__()
+}
+class ReplayBuffer {
+    add()
+    sample()
+    __len__()
+    load_and_run()
+        action_size
+    memory
+    batch_size
+    experience
+    seed
+    __init__()
+}
+@enduml
