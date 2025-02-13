@@ -36,7 +36,7 @@ class Agent():
         num_agents,
         random_seed = 0,
         batch_size = 128,
-        lr_actor =  1e-4,
+        lr_actor =  5e-4,
         lr_critic = 1e-3,
         noise_theta = 0.15,
         noise_sigma = 0.2,
