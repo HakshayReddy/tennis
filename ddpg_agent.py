@@ -74,9 +74,13 @@ class Agent():
             self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=lr_actor)
 
             # Critic Networks (w/ Target Networks)
-            self.critic_local = Critic(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
-            self.critic_target = Critic(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
-            self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=lr_critic, weight_decay=WEIGHT_DECAY)
+            self.critic_local_1 = Critic(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_target_1 = Critic(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_optimizer_1 = optim.Adam(self.critic_local_1.parameters(), lr=lr_critic, weight_decay=WEIGHT_DECAY)
+
+            self.critic_local_2 = Critic(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_target_2 = Critic(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_optimizer_2 = optim.Adam(self.critic_local_2.parameters(), lr=lr_critic, weight_decay=WEIGHT_DECAY)
 
         elif network == 'SELU':
             # Actor Network (w/ Target Network)
@@ -85,9 +89,13 @@ class Agent():
             self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=lr_actor)
 
             # Critic Networks (w/ Target Networks)
-            self.critic_local = Critic_SELU(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
-            self.critic_target = Critic_SELU(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
-            self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=lr_critic, weight_decay=WEIGHT_DECAY)
+            self.critic_local_1 = Critic_SELU(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_target_1 = Critic_SELU(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_optimizer_1 = optim.Adam(self.critic_local_1.parameters(), lr=lr_critic, weight_decay=WEIGHT_DECAY)
+
+            self.critic_local_2 = Critic_SELU(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_target_2 = Critic_SELU(state_size, action_size, random_seed, critic_fc1, critic_fc2).to(device)
+            self.critic_optimizer_2 = optim.Adam(self.critic_local_2.parameters(), lr=lr_critic, weight_decay=WEIGHT_DECAY)
             
         # Noise process
         self.noise = OUNoise((num_agents, action_size), random_seed, theta=noise_theta, sigma=noise_sigma)
@@ -97,7 +105,7 @@ class Agent():
 
         # Initialize the time step counter for updating each UPDATE_EVERY number of steps)
         self.t_step = 0
-    
+        
     # Don't forget to make add_noise False when not training.
     def act(self, state, add_noise=True, noise_scale=1.0):
         """Returns actions for given state as per current policy."""
@@ -141,8 +149,13 @@ class Agent():
         # Fix: Ensure TD error computation is only done if batch size > 1
         if state_batch.shape[0] > 1:
             with torch.no_grad():
-                Q_expected = self.critic_local(state_batch, action_batch)
-                Q_next = self.critic_target(next_state_batch, self.actor_target(next_state_batch))
+                Q_expected_1 = self.critic_local_1(state_batch, action_batch)
+                Q_expected_2 = self.critic_local_2(state_batch, action_batch)
+                Q_expected = torch.min(Q_expected_1, Q_expected_2)
+                actions_next = self.actor_target(next_state_batch)
+                Q_next_1 = self.critic_target_1(next_state_batch, actions_next)
+                Q_next_2 = self.critic_target_2(next_state_batch, actions_next)
+                Q_next = torch.min(Q_next_1, Q_next_2)
         else:
             # Expand dimensions to avoid BatchNorm errors
             state_batch = state_batch.unsqueeze(0)
@@ -150,8 +163,13 @@ class Agent():
             next_state_batch = next_state_batch.unsqueeze(0)
 
             with torch.no_grad():
-                Q_expected = self.critic_local(state_batch, action_batch)
-                Q_next = self.critic_target(next_state_batch, self.actor_target(next_state_batch))
+                Q_expected_1 = self.critic_local_1(state_batch, action_batch)
+                Q_expected_2 = self.critic_local_2(state_batch, action_batch)
+                Q_expected = torch.min(Q_expected_1, Q_expected_2)
+                actions_next_batch = self.actor_target(next_state_batch)
+                Q_next_1 = self.critic_target_1(next_state_batch, actions_next_batch)
+                Q_next_2 = self.critic_target_2(next_state_batch, actions_next_batch)
+                Q_next = torch.min(Q_next_1, Q_next_2)
 
         Q_target = reward_batch + (gamma * Q_next * (1 - done_batch))
         errors = torch.abs(Q_expected - Q_target).cpu().numpy().flatten()
@@ -175,39 +193,50 @@ class Agent():
         """Update policy and value parameters using a batch of experience tuples."""
         
         states, actions, rewards, next_states, dones = experiences
+        
         actions_next = self.actor_target(next_states)
         
         # Compute Q targets
-        Q_targets_next = self.critic_target(next_states, actions_next).detach()
+        Q_targets_next_1 = self.critic_target_1(next_states, actions_next)
+        Q_targets_next_2 = self.critic_target_2(next_states, actions_next)
+        Q_targets_next = torch.min(Q_targets_next_1, Q_targets_next_2)
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
 
-        # Compute current Q values
-        Q_expected = self.critic_local(states, actions)
+        # Compute critic losses
+        Q_expected_1 = self.critic_local_1(states, actions)
+        critic_loss_1 = F.mse_loss(Q_expected_1, Q_targets)
+
+        Q_expected_2 = self.critic_local_2(states, actions)
+        critic_loss_2 = F.mse_loss(Q_expected_2, Q_targets)
         
+        Q_expected = torch.min(Q_expected_1, Q_expected_2)
+
+        # Minimize the loss
+        self.critic_optimizer_1.zero_grad()
+        critic_loss_1.backward(retain_graph=True)
+        self.critic_optimizer_1.step()
+
+        self.critic_optimizer_2.zero_grad()
+        critic_loss_2.backward()
+        self.critic_optimizer_2.step()
+
         # Compute TD errors (Important for PER)
         td_errors = torch.abs(Q_expected - Q_targets).detach().cpu().squeeze().numpy()
         td_errors = np.maximum(td_errors, 0.1)  # 🔹 Ensure errors are not too small
-
-        # Compute critic loss (with importance sampling weights)
-        critic_loss = (F.mse_loss(Q_expected, Q_targets, reduction='none') * weights).mean()
-
-        # Update critic
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
-
+        
         # Update actor (every `policy_delay` steps)
         self.update_count = (self.update_count + 1) % self.policy_delay
         if self.update_count == 0:
             actions_pred = self.actor_local(states)
-            actor_loss = -self.critic_local(states, actions_pred).mean()
+            actor_loss = -self.critic_local_1(states, actions_pred).mean()
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
 
             # Update target networks
-            self.soft_update(self.critic_local, self.critic_target, tau)
+            self.soft_update(self.critic_local_1, self.critic_target_1, tau)
+            self.soft_update(self.critic_local_2, self.critic_target_2, tau)
             self.soft_update(self.actor_local, self.actor_target, tau)
 
         # Update experience priorities
