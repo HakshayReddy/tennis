@@ -147,29 +147,43 @@ class Agent():
         done_batch = torch.tensor([b[4] for b in batch], dtype=torch.uint8, device=device)
 
         # Fix: Ensure TD error computation is only done if batch size > 1
-        if state_batch.shape[0] > 1:
-            with torch.no_grad():
-                Q_expected_1 = self.critic_local_1(state_batch, action_batch)
-                Q_expected_2 = self.critic_local_2(state_batch, action_batch)
-                Q_expected = torch.min(Q_expected_1, Q_expected_2)
-                actions_next = self.actor_target(next_state_batch)
-                Q_next_1 = self.critic_target_1(next_state_batch, actions_next)
-                Q_next_2 = self.critic_target_2(next_state_batch, actions_next)
-                Q_next = torch.min(Q_next_1, Q_next_2)
-        else:
+        # if state_batch.shape[0] > 1:
+        #     with torch.no_grad():
+        #         Q_expected_1 = self.critic_local_1(state_batch, action_batch)
+        #         Q_expected_2 = self.critic_local_2(state_batch, action_batch)
+        #         Q_expected = torch.min(Q_expected_1, Q_expected_2)
+        #         actions_next = self.actor_target(next_state_batch)
+        #         Q_next_1 = self.critic_target_1(next_state_batch, actions_next)
+        #         Q_next_2 = self.critic_target_2(next_state_batch, actions_next)
+        #         Q_next = torch.min(Q_next_1, Q_next_2)
+        # else:
+        #     # Expand dimensions to avoid BatchNorm errors
+        #     state_batch = state_batch.unsqueeze(0)
+        #     action_batch = action_batch.unsqueeze(0)
+        #     next_state_batch = next_state_batch.unsqueeze(0)
+
+        #     with torch.no_grad():
+        #         Q_expected_1 = self.critic_local_1(state_batch, action_batch)
+        #         Q_expected_2 = self.critic_local_2(state_batch, action_batch)
+        #         Q_expected = torch.min(Q_expected_1, Q_expected_2)
+        #         actions_next_batch = self.actor_target(next_state_batch)
+        #         Q_next_1 = self.critic_target_1(next_state_batch, actions_next_batch)
+        #         Q_next_2 = self.critic_target_2(next_state_batch, actions_next_batch)
+        #         Q_next = torch.min(Q_next_1, Q_next_2)
+        if state_batch.shape[0] <= 1:
             # Expand dimensions to avoid BatchNorm errors
             state_batch = state_batch.unsqueeze(0)
             action_batch = action_batch.unsqueeze(0)
             next_state_batch = next_state_batch.unsqueeze(0)
-
-            with torch.no_grad():
-                Q_expected_1 = self.critic_local_1(state_batch, action_batch)
-                Q_expected_2 = self.critic_local_2(state_batch, action_batch)
-                Q_expected = torch.min(Q_expected_1, Q_expected_2)
-                actions_next_batch = self.actor_target(next_state_batch)
-                Q_next_1 = self.critic_target_1(next_state_batch, actions_next_batch)
-                Q_next_2 = self.critic_target_2(next_state_batch, actions_next_batch)
-                Q_next = torch.min(Q_next_1, Q_next_2)
+            
+        with torch.no_grad():
+            Q_expected_1 = self.critic_local_1(state_batch, action_batch)
+            Q_expected_2 = self.critic_local_2(state_batch, action_batch)
+            Q_expected = torch.mean(Q_expected_1, Q_expected_2)
+            actions_next_batch = self.actor_target(next_state_batch)
+            Q_next_1 = self.critic_target_1(next_state_batch, actions_next_batch)
+            Q_next_2 = self.critic_target_2(next_state_batch, actions_next_batch)
+            Q_next = torch.mean(Q_next_1, Q_next_2)
 
         Q_target = reward_batch + (gamma * Q_next * (1 - done_batch))
         errors = torch.abs(Q_expected - Q_target).cpu().numpy().flatten()
@@ -199,30 +213,40 @@ class Agent():
         # Compute Q targets
         Q_targets_next_1 = self.critic_target_1(next_states, actions_next)
         Q_targets_next_2 = self.critic_target_2(next_states, actions_next)
-        Q_targets_next = torch.min(Q_targets_next_1, Q_targets_next_2)
-        Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
+        Q_targets_1 = rewards + (gamma * Q_targets_next_1 * (1 - dones))
+        Q_targets_2 = rewards + (gamma * Q_targets_next_2 * (1 - dones))
+        Q_targets = torch.mean(Q_targets_1, Q_targets_2)
 
         # Compute critic losses
         Q_expected_1 = self.critic_local_1(states, actions)
-        critic_loss_1 = F.mse_loss(Q_expected_1, Q_targets)
+        critic_loss_1 = F.mse_loss(Q_expected_1, Q_targets_2)
 
         Q_expected_2 = self.critic_local_2(states, actions)
-        critic_loss_2 = F.mse_loss(Q_expected_2, Q_targets)
+        critic_loss_2 = F.mse_loss(Q_expected_2, Q_targets_1)
         
-        Q_expected = torch.min(Q_expected_1, Q_expected_2)
+        Q_expected = torch.mean(Q_expected_1, Q_expected_2)
 
-        # Minimize the loss
-        self.critic_optimizer_1.zero_grad()
-        critic_loss_1.backward(retain_graph=True)
-        self.critic_optimizer_1.step()
+        # # Minimize the loss
+        # self.critic_optimizer_1.zero_grad()
+        # critic_loss_1.backward(retain_graph=True)
+        # self.critic_optimizer_1.step()
 
-        self.critic_optimizer_2.zero_grad()
-        critic_loss_2.backward()
-        self.critic_optimizer_2.step()
+        # self.critic_optimizer_2.zero_grad()
+        # critic_loss_2.backward()
+        # self.critic_optimizer_2.step()
+
+        if random.choice([True, False]):  
+            self.critic_optimizer_1.zero_grad()
+            critic_loss_1.backward()
+            self.critic_optimizer_1.step()
+        else:
+            self.critic_optimizer_2.zero_grad()
+            critic_loss_2.backward()
+            self.critic_optimizer_2.step()
 
         # Compute TD errors (Important for PER)
         td_errors = torch.abs(Q_expected - Q_targets).detach().cpu().squeeze().numpy()
-        td_errors = np.maximum(td_errors, 0.1)  # 🔹 Ensure errors are not too small
+        td_errors = np.maximum(td_errors, 0.01)  #  Ensure errors are not too small
         
         # Update actor (every `policy_delay` steps)
         self.update_count = (self.update_count + 1) % self.policy_delay
